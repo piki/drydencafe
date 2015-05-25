@@ -1,0 +1,49 @@
+#!/bin/bash
+
+THUMB_WIDTH=240
+THUMB_HEIGHT=180
+THUMB_QUALITY=80
+
+if [ -r index.raw ]; then
+  echo "ERROR: index.raw already exists.  I won't overwrite it."
+  exit
+fi
+
+CAT=/bin/cat
+FIND=/usr/bin/find
+CJPEG=/usr/bin/cjpeg
+DJPEG=/usr/bin/djpeg
+PPMSCALE=/usr/bin/pnmscale
+
+DATE=$(basename $(pwd))
+
+function thumb_jpeg {
+  echo -n "$1..." 1>&2
+  THUMB=".thumb/$1"
+	CAPTION=`basename "$1" .jpg`
+
+  # make the thumbnail
+	if [ ! -r "$THUMB" ]; then
+		$DJPEG "$1" | $PPMSCALE --xysize $THUMB_WIDTH $THUMB_HEIGHT | $CJPEG -quality $THUMB_QUALITY > "$THUMB"
+	fi
+
+  # emit some HTML
+  SIZE=`$DJPEG "$THUMB" | head -2 | tail -1`
+  WIDTH=`echo $SIZE | cut -d' ' -f1`
+  HEIGHT=`echo $SIZE | cut -d' ' -f2`
+	echo "@INCLUDE(macro-photo.raw,date={$DATE},img={`basename "$1" .jpg`})"
+  echo " ok" 1>&2
+}
+
+mkdir -p .thumb
+
+(cat <<EOF
+<br clear="all">
+<a name="$DATE"></a>
+<h2>Title</h2>
+EOF
+
+$FIND . -maxdepth 1 -perm -444 -name '*.jpg' | sort | cut -d/ -f2- | \
+while read i; do
+	thumb_jpeg "$i"
+done) > index.raw
